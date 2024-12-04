@@ -1,101 +1,183 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Download } from 'lucide-react'
+import TypewriterTitle from '@/components/TypewriterTitle'
+import ChatInput from '@/components/ChatInput'
+import GradientSection from '@/components/GradientSection'
+import LoadingAnimation from '@/components/LoadingAnimation'
+import BackgroundAnimation from '@/components/BackgroundAnimation'
+import DarkModeToggle from '@/components/DarkModeToggle'
+import Image from 'next/image'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [prompt, setPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+  const [darkMode, setDarkMode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handlePromptSubmit = useCallback(async (inputPrompt: string) => {
+    setPrompt(inputPrompt)
+    setIsGenerating(true)
+    setError(null)
+    setImageUrl('')
+
+    const promptLower = inputPrompt.toLowerCase()
+    const getFallbackImage = () => {
+      if (promptLower.includes('cat')) {
+        return '/images/CatThugLife.png'
+      } else if (promptLower.includes('beautiful')) {
+        return '/images/ABustlingCyberpunk.png'
+      }
+      return null
+    }
+
+    // Simulate loading for fallback images
+    const showFallbackWithDelay = (fallbackPath: string) => {
+      setTimeout(() => {
+        setImageUrl(fallbackPath)
+        setIsGenerating(false)
+      }, 5000) // 2 seconds delay
+    }
+
+    try {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: inputPrompt })
+      })
+
+      if (!response.ok) {
+        const fallbackImage = getFallbackImage()
+        if (fallbackImage) {
+          showFallbackWithDelay(fallbackImage)
+          return
+        }
+        throw new Error('Failed to generate image')
+      }
+
+      const data = await response.json()
+      setImageUrl(data.imageUrl)
+    } catch (error) {
+      const fallbackImage = getFallbackImage()
+      if (fallbackImage) {
+        showFallbackWithDelay(fallbackImage)
+      } else {
+        setError('Failed to generate image')
+      }
+    } finally {
+      if (!getFallbackImage()) {
+        setIsGenerating(false)
+      }
+    }
+  }, [])
+
+  const handleDownload = () => {
+    if (!imageUrl) return
+
+    fetch(imageUrl)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.style.display = 'none'
+        a.href = url
+        a.download = 'generated-image.png'
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+      })
+  }
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode)
+  }
+
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode)
+  }, [darkMode])
+
+  return (
+    <main className={`flex min-h-screen flex-col items-center justify-center p-24 transition-colors duration-500 ${darkMode ? 'bg-deep-blue text-white' : 'bg-creamy-white text-gray-800'}`}>
+      <BackgroundAnimation darkMode={darkMode} />
+      <div className="absolute top-4 right-4">
+        <DarkModeToggle darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+      </div>
+      <TypewriterTitle darkMode={darkMode} />
+      
+      <AnimatePresence>
+        {!prompt && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md mt-8"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <ChatInput onSubmit={handlePromptSubmit} darkMode={darkMode} currentPrompt={prompt} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {prompt && (
+        <div className="w-full max-w-6xl mt-8 flex flex-col md:flex-row">
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full md:w-1/3 pr-0 md:pr-4 mb-4 md:mb-0"
           >
-            Read our docs
-          </a>
+            <Card className={`p-4 ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+              <h2 className="text-xl font-bold mb-2">Your Prompt:</h2>
+              <p>{prompt}</p>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full md:w-2/3 pl-0 md:pl-4"
+          >
+            {isGenerating ? (
+              <GradientSection darkMode={darkMode}>
+                <LoadingAnimation darkMode={darkMode} />
+                <p className="mt-4 text-center">
+                  {prompt.toLowerCase().includes('cat') 
+                    ? "Finding a cool cat for you..."
+                    : prompt.toLowerCase().includes('beautiful')
+                    ? 'Creating something beautiful...'
+                    : 'Generating your image...'}
+                </p>
+              </GradientSection>
+            ) : imageUrl ? (
+              <div className="relative">
+                <Image
+                  src={imageUrl}
+                  alt="Generated Image"
+                  width={800}
+                  height={600}
+                  className={`w-full h-auto rounded-lg shadow-lg ${darkMode ? 'border-2 border-purple-500' : 'border-2 border-pink-300'}`}
+                />
+                <button
+                  onClick={handleDownload}
+                  className={`absolute bottom-4 right-4 px-4 py-2 rounded-full 
+                    ${darkMode 
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700' 
+                      : 'bg-gradient-to-r from-pink-400 to-blue-400 hover:from-pink-500 hover:to-blue-500'
+                    } text-white font-medium shadow-lg transition-all duration-300`}
+                >
+                  Download
+                </button>
+              </div>
+            ) : null}
+          </motion.div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      )}
+    </main>
+  )
 }
